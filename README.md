@@ -94,6 +94,25 @@ docker build -f enclave/Dockerfile.enclave -t jira-cat:enclave .
 
 Host proxy sketch: `vsock-proxy` / `socat` from parent TCP to enclave CID port `5000`/`8080`. Only release sealed model DEK after PCR verification against the expected EIF measurements.
 
+## Ops UI
+
+Simple browser UI for historical surge charts and human triage:
+
+```bash
+# ensure a model exists
+jira-cat-pipeline --config config/kafka_public.yaml
+
+# serve API + UI
+jira-cat-serve --config config/kafka_public.yaml --host 127.0.0.1 --port 8080
+# open http://127.0.0.1:8080/
+```
+
+- **Historical view**: line charts by driver (`labels`, `impacted_area`, `issuetype`, `status`) and window (`1d` / `1w` / `1m` / `3m`), plus known-vs-novel volume and surge / new-label callouts.
+- **Triage inbox**: table of recent tickets with ML-suggested label + impacted area dropdowns; expand description; **Save** writes feedback locally and pushes to Jira when credentials are set (`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`).
+- **Learning loop**: disagreements land in `artifacts/feedback/corrections.jsonl`; **Retrain with feedback** merges corrections into training and promotes a new model.
+- **Offline-first data**: import a Jira **Excel/CSV** export in the UI, or connect **Jira API** when available. Local cache keeps learning/triage working without network.
+- **Day watch**: forecast (dashed) vs actual hourly lines for **today + next day**, with a short management summary (on-track / surge / novel category).
+
 ## Monitoring: category surges + new label suggestions
 
 Classical monitors (no LLM), run after train or via `jira-cat-monitor`:

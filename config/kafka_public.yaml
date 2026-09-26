@@ -11,6 +11,9 @@ paths:
   metrics_dir: artifacts/metrics/kafka_public
   reports_dir: artifacts/reports/kafka_public
   sealed_dir: artifacts/sealed/kafka_public
+  cache_dir: artifacts/cache/kafka_public
+  feedback_dir: artifacts/feedback/kafka_public
+  uploads_dir: artifacts/uploads/kafka_public
 
 data:
   text_fields:
@@ -57,6 +60,15 @@ inference:
   port: 8080
   vsock_port: 5000
   top_k_labels: 5
+
+ui:
+  cache_ttl_seconds: 300
+
+jira:
+  enabled: false
+  base_url: "https://issues.apache.org/jira"
+  jql: "project = KAFKA AND labels is not EMPTY AND component is not EMPTY ORDER BY created DESC"
+  fetch_limit: 100
 
 enclave:
   mode: local_dev

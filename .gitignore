@@ -10,6 +10,9 @@ artifacts/metrics/*
 artifacts/reports/*
 artifacts/processed/*
 artifacts/sealed/*
+artifacts/cache/*
+artifacts/feedback/*
+artifacts/uploads/*
 !artifacts/**/.gitkeep
 dist/
 build/

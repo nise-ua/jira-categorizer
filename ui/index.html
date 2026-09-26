@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enclave Cat — Jira triage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <header class="top">
+    <div class="brand-block">
+      <p class="brand">Enclave Cat</p>
+      <p class="tagline">Learn from Jira API or Excel export — forecast surges, triage, improve</p>
+    </div>
+    <div class="top-actions">
+      <span id="metaBadge" class="badge">loading…</span>
+      <button id="btnRefresh" class="btn ghost" type="button">Refresh</button>
+      <button id="btnRetrain" class="btn" type="button">Retrain with feedback</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel source" aria-labelledby="sourceTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="sourceTitle">Data source</h2>
+          <p class="panel-sub">Works offline via Excel/CSV export, or live via Jira API when connected</p>
+        </div>
+      </div>
+      <div class="source-grid">
+        <div class="source-card">
+          <h3>Mode</h3>
+          <div class="seg" role="group" aria-label="Source mode">
+            <button type="button" class="seg-btn" data-mode="cache">Local cache</button>
+            <button type="button" class="seg-btn" data-mode="spreadsheet">Excel / CSV</button>
+            <button type="button" class="seg-btn" data-mode="jira">Jira API</button>
+          </div>
+          <p id="sourceHint" class="muted source-hint"></p>
+        </div>
+        <div class="source-card">
+          <h3>Import Jira spreadsheet</h3>
+          <form id="uploadForm" class="upload-form">
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.json,.jsonl" />
+            <button class="btn small" type="submit">Upload &amp; use</button>
+          </form>
+          <p class="muted">Export from Jira (Issues → Export Excel/CSV). No network needed after upload.</p>
+        </div>
+        <div class="source-card">
+          <h3>Connect Jira API</h3>
+          <form id="jiraForm" class="jira-form">
+            <label>Base URL <input id="jiraUrl" type="url" placeholder="https://your.atlassian.net" /></label>
+            <label>JQL <input id="jiraJql" type="text" value="order by created DESC" /></label>
+            <label>Email <input id="jiraEmail" type="email" autocomplete="username" /></label>
+            <label>API token <input id="jiraToken" type="password" autocomplete="current-password" /></label>
+            <button class="btn small" type="submit">Fetch from Jira</button>
+          </form>
+          <p class="muted">If unreachable, stay on Excel — triage &amp; learning still work.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel anomaly" aria-labelledby="anomalyTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="anomalyTitle">Day watch — forecast vs actual</h2>
+          <p class="panel-sub">Today + next day hourly projection, with live actuals and a management readout</p>
+        </div>
+        <div class="controls">
+          <label>
+            Category driver
+            <select id="forecastDimension">
+              <option value="labels">Labels</option>
+              <option value="impacted_area">Impacted area</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="anomaly-grid">
+        <article class="chart-card anomaly-chart">
+          <h3>Tickets / hour — forecast (dashed) vs actual</h3>
+          <canvas id="forecastChart" height="140"></canvas>
+          <p id="dayMarker" class="muted day-marker"></p>
+        </article>
+        <aside id="daySummary" class="day-summary" aria-live="polite">
+          <p class="muted">Loading day summary…</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel history" aria-labelledby="historyTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="historyTitle">Historical view</h2>
+          <p class="panel-sub">Ticket volume by category driver — known surges and novel spikes</p>
+        </div>
+        <div class="controls">
+          <label>
+            Driver
+            <select id="dimension">
+              <option value="labels">Labels</option>
+              <option value="impacted_area">Impacted area</option>
+              <option value="issuetype">Issue type</option>
+              <option value="status">Status</option>
+            </select>
+          </label>
+          <label>
+            Window
+            <select id="window">
+              <option value="1d">1 day</option>
+              <option value="1w">1 week</option>
+              <option value="1m" selected>1 month</option>
+              <option value="3m">3 months</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <article class="chart-card">
+          <h3>Category volume</h3>
+          <canvas id="categoryChart" height="120"></canvas>
+        </article>
+        <article class="chart-card">
+          <h3>Known vs novel issue types</h3>
+          <canvas id="noveltyChart" height="120"></canvas>
+          <ul id="surgeList" class="surge-list"></ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel triage" aria-labelledby="triageTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="triageTitle">Triage inbox</h2>
+          <p class="panel-sub">Correct labels / impacted area — saves feedback for learning; pushes to Jira only when connected</p>
+        </div>
+        <div class="controls">
+          <label>
+            Inbox window
+            <select id="triageDays">
+              <option value="1" selected>Today / 1 day</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="triageMount" class="triage-mount">
+        <p class="muted">Loading triage queue…</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
