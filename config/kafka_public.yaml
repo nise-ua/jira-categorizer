@@ -72,3 +72,22 @@ mlops:
   drift_check:
     enabled: true
     max_mean_text_len_shift: 0.50
+
+monitoring:
+  surge:
+    enabled: true
+    # Kafka sample spans years; use wider windows for demo sensitivity
+    recent_days: 90
+    baseline_days: 365
+    min_recent_count: 2
+    min_rate_ratio: 2.0
+    min_z_score: 1.5
+    epsilon: 0.5
+  new_labels:
+    enabled: true
+    label_confidence_threshold: 0.40
+    area_confidence_threshold: 0.45
+    min_cluster_size: 3
+    max_clusters: 6
+    max_suggestions: 5
+    top_terms: 5

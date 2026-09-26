@@ -11,6 +11,7 @@ from jira_categorizer.config import load_config
 from jira_categorizer.data.preprocess import combine_summary_description
 from jira_categorizer.models.area_model import predict_areas
 from jira_categorizer.models.labels_model import predict_labels
+from jira_categorizer.monitor.novelty import score_novelty
 from jira_categorizer.registry.model_store import ModelStore
 
 
@@ -64,7 +65,13 @@ class Categorizer:
                     "impacted_area_scored": areas,
                 }
             )
-        return out
+        # Flag tickets that look like a new issue type (low confidence)
+        nl = self.cfg.get("monitoring", {}).get("new_labels", {})
+        return score_novelty(
+            out,
+            label_conf_threshold=float(nl.get("label_confidence_threshold", 0.35)),
+            area_conf_threshold=float(nl.get("area_confidence_threshold", 0.40)),
+        )
 
 
 def main(argv: list[str] | None = None) -> None:

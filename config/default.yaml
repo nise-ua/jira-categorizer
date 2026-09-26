@@ -83,3 +83,23 @@ mlops:
     enabled: true
     # Simple PSI-style check on token length / top terms
     max_mean_text_len_shift: 0.35
+
+monitoring:
+  # Category surge: recent window vs baseline (labels + impacted_area)
+  surge:
+    enabled: true
+    recent_days: 7
+    baseline_days: 28
+    min_recent_count: 3
+    min_rate_ratio: 2.5
+    min_z_score: 2.0
+    epsilon: 0.5
+  # Suggest new labels when novel issue clusters appear
+  new_labels:
+    enabled: true
+    label_confidence_threshold: 0.35
+    area_confidence_threshold: 0.40
+    min_cluster_size: 3
+    max_clusters: 8
+    max_suggestions: 5
+    top_terms: 5

@@ -37,6 +37,7 @@ jira-cat-train = "jira_categorizer.train.train:main"
 jira-cat-predict = "jira_categorizer.infer.predict:main"
 jira-cat-serve = "jira_categorizer.enclave.server:main"
 jira-cat-pipeline = "jira_categorizer.pipeline.mlops:main"
+jira-cat-monitor = "jira_categorizer.monitor.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

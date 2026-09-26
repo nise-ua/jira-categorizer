@@ -94,6 +94,21 @@ docker build -f enclave/Dockerfile.enclave -t jira-cat:enclave .
 
 Host proxy sketch: `vsock-proxy` / `socat` from parent TCP to enclave CID port `5000`/`8080`. Only release sealed model DEK after PCR verification against the expected EIF measurements.
 
+## Monitoring: category surges + new label suggestions
+
+Classical monitors (no LLM), run after train or via `jira-cat-monitor`:
+
+1. **Category surge** — compare recent vs baseline daily rates for each `label` and `impacted_area` using rate-ratio + z-score. Alerts when a category spikes.
+2. **New label suggestion** — tickets with low label *and* area confidence are treated as novel, clustered (TF-IDF + MiniBatchKMeans), and a slug is proposed from top terms + exemplar issues.
+
+```bash
+jira-cat-monitor --config config/kafka_public.yaml
+# reports: artifacts/reports/.../category_surges.json
+#          artifacts/reports/.../new_label_suggestions.json
+```
+
+Inference also attaches a `novelty` block per ticket. HTTP: `GET /monitor/surges`, `GET /monitor/new-labels`.
+
 ## Public Jira experiment (Apache Kafka)
 
 Fetched **100** anonymously readable issues from [Apache Jira / KAFKA](https://issues.apache.org/jira) with non-empty `labels` and `components`:

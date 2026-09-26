@@ -9,8 +9,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from jira_categorizer.config import load_config
+from jira_categorizer.data.ingest import load_jira_export
 from jira_categorizer.enclave.attestation import require_attestation
 from jira_categorizer.infer.predict import Categorizer
+from jira_categorizer.monitor.new_labels import suggest_new_labels
+from jira_categorizer.monitor.surge import detect_category_surges
 
 app = FastAPI(title="Jira Enclave Categorizer", version="0.1.0")
 _STATE: dict[str, Any] = {}
@@ -80,6 +83,26 @@ def predict_batch(req: BatchPredictRequest) -> dict[str, Any]:
         if t.issue_key:
             preds[i]["issue_key"] = t.issue_key
     return {"results": preds}
+
+
+@app.get("/monitor/surges")
+def monitor_surges() -> dict[str, Any]:
+    cfg = _STATE["cfg"]
+    tickets = load_jira_export(cfg["paths"]["raw_data"])
+    return detect_category_surges(
+        tickets,
+        cfg=cfg,
+        label_field=cfg["data"]["label_field"],
+        area_field=cfg["data"]["area_field"],
+    )
+
+
+@app.get("/monitor/new-labels")
+def monitor_new_labels() -> dict[str, Any]:
+    cfg = _STATE["cfg"]
+    model: Categorizer = _STATE["model"]
+    tickets = load_jira_export(cfg["paths"]["raw_data"])
+    return suggest_new_labels(tickets, model, cfg=cfg)
 
 
 def main(argv: list[str] | None = None) -> None:

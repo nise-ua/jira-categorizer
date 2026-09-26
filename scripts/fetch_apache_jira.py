@@ -15,8 +15,9 @@ from pathlib import Path
 BASE = "https://issues.apache.org/jira/rest/api/2/search"
 DEFAULT_JQL = (
     "project = KAFKA AND labels is not EMPTY AND component is not EMPTY "
-    "ORDER BY updated DESC"
+    "ORDER BY created DESC"
 )
+FIELDS = "key,summary,description,labels,components,issuetype,status,created,updated"
 
 
 def fetch_page(jql: str, start_at: int, max_results: int) -> dict:
@@ -25,7 +26,7 @@ def fetch_page(jql: str, start_at: int, max_results: int) -> dict:
             "jql": jql,
             "startAt": start_at,
             "maxResults": max_results,
-            "fields": "key,summary,description,labels,components,issuetype,status",
+            "fields": FIELDS,
         }
     )
     req = urllib.request.Request(
@@ -51,6 +52,8 @@ def to_row(issue: dict) -> dict:
         "impacted_area": "|".join(comps),
         "issuetype": (fields.get("issuetype") or {}).get("name", ""),
         "status": (fields.get("status") or {}).get("name", ""),
+        "created": fields.get("created") or "",
+        "updated": fields.get("updated") or "",
     }
 
 
@@ -106,6 +109,7 @@ def main() -> None:
                 f"- JQL: `{args.jql}`",
                 f"- Count: {len(rows)}",
                 "- Mapping: components -> impacted_area; labels -> labels",
+                "- Timestamps: created, updated (for surge detection)",
                 "",
                 "## Top labels",
                 *[f"- {k}: {v}" for k, v in lab_c.most_common(15)],

@@ -32,6 +32,9 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         "component/s": "impacted_area",
         "component": "impacted_area",
         "custom_field_impacted_area": "impacted_area",
+        "created": "created",
+        "created_date": "created",
+        "updated": "updated",
     }
     renamed = {}
     for original, lowered in mapping.items():
@@ -65,6 +68,8 @@ def load_jira_export(path: str | Path) -> pd.DataFrame:
                             "labels": fields.get("labels"),
                             "impacted_area": fields.get("customfield_impacted_area")
                             or fields.get("components"),
+                            "created": fields.get("created"),
+                            "updated": fields.get("updated"),
                         }
                     )
                 df = pd.DataFrame(rows)
@@ -87,6 +92,8 @@ def load_jira_export(path: str | Path) -> pd.DataFrame:
 
     df["summary"] = df["summary"].fillna("").astype(str)
     df["description"] = df["description"].fillna("").astype(str)
+    if "created" not in df.columns:
+        df["created"] = pd.NaT
     return df
 
 
