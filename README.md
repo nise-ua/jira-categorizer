@@ -94,6 +94,28 @@ docker build -f enclave/Dockerfile.enclave -t jira-cat:enclave .
 
 Host proxy sketch: `vsock-proxy` / `socat` from parent TCP to enclave CID port `5000`/`8080`. Only release sealed model DEK after PCR verification against the expected EIF measurements.
 
+## Public Jira experiment (Apache Kafka)
+
+Fetched **100** anonymously readable issues from [Apache Jira / KAFKA](https://issues.apache.org/jira) with non-empty `labels` and `components`:
+
+```bash
+python scripts/fetch_apache_jira.py --limit 100 --out sample_data/public_jira/kafka_100.csv
+jira-cat-pipeline --config config/kafka_public.yaml
+```
+
+Field mapping: `components` → `impacted_area`, `labels` → multi-label target.
+
+Holdout results on this slice (75 train / 25 test, classical TF-IDF + logistic regression):
+
+| Target | Metric | Score |
+|---|---|---|
+| Impacted area (6 classes) | Accuracy | ~0.62 |
+| Impacted area | F1 weighted | ~0.54 |
+| Labels (13 classes) | F1 micro | ~0.50 |
+| Labels | F1 macro | ~0.41 |
+
+Area prediction from summary/description is usable even at n=100. Labels are noisier (process tags like `kip` / `newbie` / `gradle`) and benefit from taxonomy cleanup + more volume. Full write-up: `artifacts/reports/kafka_public/kafka_public_experiment.md`.
+
 ## Tests
 
 ```bash
