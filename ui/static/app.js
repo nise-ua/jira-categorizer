@@ -152,53 +152,7 @@ function renderDaySummary(payload) {
   $("dayMarker").textContent = `As of ${payload.as_of || "—"} · today ${payload.today || "—"} · tomorrow ${payload.tomorrow || "—"} (UTC)`;
 }
 
-function renderIncomeTree(payload) {
-  const el = $("incomeSunburst");
-  if (!state.incomeChart) {
-    state.incomeChart = echarts.init(el);
-    window.addEventListener("resize", () => state.incomeChart && state.incomeChart.resize());
-  }
-  const colors = ["#0F6E56", "#C45C26", "#1F4B7A", "#8B3A4A", "#5B6B2F", "#6B4C9A", "#A67C2A", "#2F6F8F"];
-  state.incomeChart.setOption(
-    {
-      color: colors,
-      series: [
-        {
-          type: "sunburst",
-          data: payload.sunburst?.children || [],
-          radius: [28, "92%"],
-          sort: undefined,
-          emphasis: { focus: "ancestor" },
-          levels: [
-            {},
-            {
-              r0: "28%",
-              r: "58%",
-              itemStyle: { borderWidth: 2, borderColor: "#f7fffb" },
-              label: { rotate: "tangential", fontSize: 11, fontFamily: "IBM Plex Sans" },
-            },
-            {
-              r0: "58%",
-              r: "92%",
-              label: { position: "outside", silent: false, fontSize: 10, fontFamily: "IBM Plex Sans" },
-              itemStyle: { borderWidth: 1, borderColor: "#f7fffb" },
-            },
-          ],
-          label: { color: "#13232b" },
-          itemStyle: { borderRadius: 4 },
-        },
-      ],
-      tooltip: {
-        formatter(info) {
-          const v = info.value ?? info.data?.value ?? 0;
-          const pct = payload.total ? ((100 * v) / payload.total).toFixed(0) : 0;
-          return `${info.name}<br/><b>${v}</b> tickets · ${pct}% of period`;
-        },
-      },
-    },
-    true
-  );
-
+function renderIncomeSummary(payload) {
   const box = $("incomeSummary");
   const tops = payload.top_areas || [];
   const max = tops[0]?.count || 1;
@@ -217,8 +171,73 @@ function renderIncomeTree(payload) {
         )
         .join("")}
     </ul>
-    <p class="muted" style="margin:0.4rem 0 0;font-size:0.82rem">Outer ring = labels inside each area. Click a segment to zoom.</p>
+    <p class="muted" style="margin:0.4rem 0 0;font-size:0.82rem">Inner ring = impacted area · outer ring = labels. Click to zoom.</p>
   `;
+}
+
+function renderIncomeTree(payload) {
+  renderIncomeSummary(payload);
+  const el = $("incomeSunburst");
+  if (typeof echarts === "undefined") {
+    el.innerHTML = `<div class="empty">Chart library unavailable — branch list on the right still shows income.</div>`;
+    return;
+  }
+  if (!state.incomeChart) {
+    state.incomeChart = echarts.init(el);
+    window.addEventListener("resize", () => state.incomeChart && state.incomeChart.resize());
+  }
+  const root = payload.sunburst || { name: "Tickets", children: [] };
+  // Ensure root has a value for center label
+  if (root.value == null) root.value = payload.total || 0;
+  const colors = ["#0F6E56", "#C45C26", "#1F4B7A", "#8B3A4A", "#5B6B2F", "#6B4C9A", "#A67C2A", "#2F6F8F"];
+  state.incomeChart.setOption(
+    {
+      color: colors,
+      series: [
+        {
+          type: "sunburst",
+          data: [root],
+          radius: [0, "95%"],
+          center: ["50%", "50%"],
+          sort: undefined,
+          emphasis: { focus: "ancestor" },
+          nodeClick: "rootToNode",
+          levels: [
+            {
+              r0: "0%",
+              r: "22%",
+              label: { rotate: 0, fontSize: 13, fontWeight: 600, fontFamily: "IBM Plex Sans" },
+              itemStyle: { color: "#13232b" },
+            },
+            {
+              r0: "22%",
+              r: "58%",
+              itemStyle: { borderWidth: 2, borderColor: "#f7fffb" },
+              label: { rotate: "tangential", fontSize: 11, fontFamily: "IBM Plex Sans" },
+            },
+            {
+              r0: "58%",
+              r: "90%",
+              label: { position: "outside", silent: false, fontSize: 10, fontFamily: "IBM Plex Sans" },
+              itemStyle: { borderWidth: 1, borderColor: "#f7fffb" },
+            },
+          ],
+          label: { color: "#13232b" },
+          itemStyle: { borderRadius: 3 },
+        },
+      ],
+      tooltip: {
+        formatter(info) {
+          const v = info.value ?? info.data?.value ?? 0;
+          const pct = payload.total ? ((100 * v) / payload.total).toFixed(0) : 0;
+          return `${info.name}<br/><b>${v}</b> tickets · ${pct}% of period`;
+        },
+      },
+    },
+    true
+  );
+  // Force layout after tab/panel visible
+  setTimeout(() => state.incomeChart && state.incomeChart.resize(), 50);
 }
 
 async function loadIncomeTree() {
@@ -510,7 +529,11 @@ function switchTab(name) {
 
 async function reloadOps() {
   await loadMeta();
-  await Promise.all([loadIncomeTree(), loadForecast(), loadCharts(), loadTriage()]);
+  const jobs = [loadIncomeTree(), loadForecast(), loadCharts(), loadTriage()];
+  const results = await Promise.allSettled(jobs);
+  results.forEach((r, i) => {
+    if (r.status === "rejected") console.error("ops load failed", i, r.reason);
+  });
 }
 
 async function boot() {

@@ -67,8 +67,8 @@ body {
   border-color: var(--teal);
   color: #f7fffb;
 }
-.tab-panel { display: none; }
-.tab-panel.active { display: grid; gap: 1.25rem; }
+.tab-panel { display: none; gap: 1.25rem; }
+.tab-panel.active { display: grid; }
 
 .train-grid {
   display: grid;
