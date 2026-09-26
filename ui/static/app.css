@@ -44,8 +44,81 @@ body {
   justify-content: space-between;
   gap: 1.5rem;
   align-items: flex-end;
-  padding: 1.75rem clamp(1rem, 3vw, 2.5rem) 1rem;
+  padding: 1.75rem clamp(1rem, 3vw, 2.5rem) 0.75rem;
   animation: rise 0.55s ease-out both;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0 clamp(1rem, 3vw, 2.5rem) 0.85rem;
+  flex-wrap: wrap;
+}
+.tab {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.55);
+  font: 600 0.92rem var(--font);
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+.tab.active {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #f7fffb;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: grid; gap: 1.25rem; }
+
+.train-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.params-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 0.75rem;
+}
+.params-form label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.params-form input, .params-form select {
+  font: 500 0.88rem var(--font);
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.5rem;
+  background: #fff;
+  color: var(--ink);
+}
+.console-card {
+  border: 1px solid var(--line);
+  background: #13232b;
+  color: #d7e7df;
+  padding: 0.85rem 0.95rem 1rem;
+}
+.console-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.console-card h3 { margin: 0; color: #f7fffb; font-size: 0.95rem; }
+.console-log {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  font: 400 0.78rem/1.45 var(--mono);
+  white-space: pre-wrap;
+}
+@media (max-width: 1100px) {
+  .train-grid { grid-template-columns: 1fr; }
+  .params-form { grid-template-columns: 1fr; }
 }
 
 @keyframes rise {

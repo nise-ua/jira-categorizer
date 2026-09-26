@@ -4,8 +4,11 @@ const state = {
   categoryChart: null,
   noveltyChart: null,
   forecastChart: null,
+  trainChart: null,
+  validateChart: null,
   triage: null,
   meta: null,
+  trainPoll: null,
 };
 
 function $(id) {
@@ -31,9 +34,7 @@ async function api(path, opts = {}) {
     try {
       const j = JSON.parse(text);
       text = j.detail || text;
-    } catch (_) {
-      /* keep text */
-    }
+    } catch (_) {}
     throw new Error(text || res.statusText);
   }
   return res.json();
@@ -43,7 +44,7 @@ function destroyChart(chart) {
   if (chart) chart.destroy();
 }
 
-function renderLineChart(canvasId, payload, previous, extraOptions = {}) {
+function renderLineChart(canvasId, payload, previous) {
   destroyChart(previous);
   const ctx = $(canvasId).getContext("2d");
   return new Chart(ctx, {
@@ -65,7 +66,6 @@ function renderLineChart(canvasId, payload, previous, extraOptions = {}) {
           position: "bottom",
           labels: { boxWidth: 12, font: { family: "IBM Plex Sans", size: 11 } },
         },
-        ...(extraOptions.plugins || {}),
       },
       scales: {
         x: {
@@ -79,6 +79,35 @@ function renderLineChart(canvasId, payload, previous, extraOptions = {}) {
         },
       },
       animation: { duration: 550, easing: "easeOutQuart" },
+    },
+  });
+}
+
+function renderBarChart(canvasId, chart, previous, color = "#0f6e56") {
+  destroyChart(previous);
+  if (!chart) return null;
+  const ctx = $(canvasId).getContext("2d");
+  return new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: chart.labels || [],
+      datasets: [
+        {
+          label: "Score",
+          data: chart.values || [],
+          backgroundColor: color,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, max: 1, ticks: { font: { size: 10 } } },
+        x: { ticks: { font: { size: 10 }, maxRotation: 30 } },
+      },
+      animation: { duration: 500 },
     },
   });
 }
@@ -125,12 +154,7 @@ function renderDaySummary(payload) {
 async function loadForecast() {
   const dimension = $("forecastDimension").value;
   const payload = await api(`/api/forecast?dimension=${encodeURIComponent(dimension)}`);
-  const plugins = {};
-  if (typeof payload.tomorrow_start_index === "number") {
-    plugins.annotation = undefined; // keep Chart.js free of plugin deps
-  }
-  // Visual: slightly emphasize tomorrow labels via dataset segment already in API
-  state.forecastChart = renderLineChart("forecastChart", payload, state.forecastChart, { plugins });
+  state.forecastChart = renderLineChart("forecastChart", payload, state.forecastChart);
   renderDaySummary(payload);
 }
 
@@ -161,7 +185,6 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
-
 function escapeAttr(s) {
   return escapeHtml(s).replaceAll("'", "&#39;");
 }
@@ -170,10 +193,9 @@ function renderTriage(data) {
   state.triage = data;
   const mount = $("triageMount");
   if (!data.items || !data.items.length) {
-    mount.innerHTML = `<div class="empty">No tickets in this inbox window. Widen the range, import Excel, or refresh.</div>`;
+    mount.innerHTML = `<div class="empty">No tickets in this inbox window.</div>`;
     return;
   }
-
   const rows = data.items
     .map((item, idx) => {
       const novel = item.is_novel
@@ -199,32 +221,20 @@ function renderTriage(data) {
             <span class="muted">ML: ${escapeHtml(item.suggested_area || "—")}</span>
           </div>
         </td>
-        <td>
-          <button class="btn small" type="button" data-action="save">Save</button>
-        </td>
+        <td><button class="btn small" type="button" data-action="save">Save</button></td>
       </tr>`;
     })
     .join("");
-
   mount.innerHTML = `
     <table class="triage-table">
-      <thead>
-        <tr>
-          <th>Ticket</th>
-          <th>Summary / description</th>
-          <th>Label</th>
-          <th>Impacted area</th>
-          <th></th>
-        </tr>
-      </thead>
+      <thead><tr><th>Ticket</th><th>Summary / description</th><th>Label</th><th>Impacted area</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
 
 async function loadTriage() {
   const days = $("triageDays").value;
-  const data = await api(`/api/triage?days=${encodeURIComponent(days)}&limit=40`);
-  renderTriage(data);
+  renderTriage(await api(`/api/triage?days=${encodeURIComponent(days)}&limit=40`));
 }
 
 async function saveRow(tr) {
@@ -249,14 +259,11 @@ async function saveRow(tr) {
         push_to_jira: true,
       }),
     });
-    const jiraNote = result.jira?.dry_run
-      ? " (local only — no Jira write creds)"
-      : result.jira?.ok
-        ? " → Jira updated"
-        : result.jira?.skipped
-          ? ""
-          : " → Jira push failed";
-    toast(`${item.issue_key} saved${result.disagreed ? " · correction queued" : ""}${jiraNote}`);
+    toast(
+      `${item.issue_key} saved${result.disagreed ? " · correction queued" : ""}${
+        result.jira?.dry_run ? " (local)" : result.jira?.ok ? " → Jira" : ""
+      }`
+    );
   } catch (err) {
     toast(`Save failed: ${err.message}`);
   } finally {
@@ -279,9 +286,7 @@ function wireTriageClicks() {
       btn.textContent = expanded ? "Collapse description" : "Expand description";
       return;
     }
-    if (btn.dataset.action === "save") {
-      await saveRow(tr);
-    }
+    if (btn.dataset.action === "save") await saveRow(tr);
   });
 }
 
@@ -290,9 +295,9 @@ function setModeButtons(mode) {
     btn.classList.toggle("active", btn.dataset.mode === mode);
   });
   const hints = {
-    cache: "Using local cached tickets / bundled sample. Fine for offline demos.",
-    spreadsheet: "Using uploaded Excel/CSV Jira export. Best when Jira API is unavailable.",
-    jira: "Using live Jira API when reachable; falls back to cache if the call fails.",
+    cache: "Local cached tickets / bundled sample.",
+    spreadsheet: "Uploaded Excel/CSV — offline learning & triage.",
+    jira: "Live Jira API when reachable; else cache.",
   };
   $("sourceHint").textContent = hints[mode] || "";
 }
@@ -301,33 +306,153 @@ async function loadMeta() {
   const meta = await api("/api/meta");
   state.meta = meta;
   setModeButtons(meta.source_mode || "cache");
-  const src = (meta.source && meta.source.source) || "n/a";
   $("metaBadge").textContent = `${meta.rows} tickets · ${meta.source_mode} · model ${
     meta.model_version || "n/a"
   } · ${meta.jira_writable ? "jira write-on" : "offline/local"}`;
-  if ($("jiraUrl") && !($("jiraUrl").value) && src.startsWith("jira:")) {
-    /* keep user fields */
-  }
   return meta;
 }
 
-async function reloadAll() {
+async function loadParams() {
+  const { params } = await api("/api/train/params");
+  $("pAlgorithm").value = params.algorithm;
+  $("pC").value = params.C;
+  $("pThr").value = params.decision_threshold;
+  $("pWord").value = params.max_word_features;
+  $("pChar").value = params.max_char_features;
+  $("pMinDf").value = params.min_df;
+  $("pTest").value = params.test_size;
+  $("pMinLab").value = params.min_label_support;
+  $("pMinArea").value = params.min_area_support;
+}
+
+function collectParams() {
+  return {
+    algorithm: $("pAlgorithm").value,
+    C: Number($("pC").value),
+    decision_threshold: Number($("pThr").value),
+    max_word_features: Number($("pWord").value),
+    max_char_features: Number($("pChar").value),
+    min_df: Number($("pMinDf").value),
+    test_size: Number($("pTest").value),
+    min_label_support: Number($("pMinLab").value),
+    min_area_support: Number($("pMinArea").value),
+  };
+}
+
+function renderTrainStatus(st) {
+  $("trainState").textContent = st.state || "idle";
+  $("trainLogs").textContent = (st.logs || []).join("\n") || "No logs yet.";
+  $("trainLogs").scrollTop = $("trainLogs").scrollHeight;
+  if (st.result && st.result.chart) {
+    state.trainChart = renderBarChart("trainChart", st.result.chart, state.trainChart);
+    const m = st.result.metrics || {};
+    $("trainHeadline").textContent = `v${st.result.version} · labels F1µ ${Number(
+      m.labels?.f1_micro || 0
+    ).toFixed(2)} · area acc ${Number(m.area?.accuracy || 0).toFixed(2)} · window ${st.result.window}`;
+  }
+}
+
+async function pollTrain() {
+  const st = await api("/api/train/status");
+  renderTrainStatus(st);
+  if (st.state === "running") {
+    state.trainPoll = setTimeout(pollTrain, 800);
+  } else {
+    state.trainPoll = null;
+    if (st.state === "completed") {
+      await loadMeta();
+      toast(`Training complete · ${st.result?.version || ""}`);
+    }
+    if (st.state === "failed") toast(`Training failed: ${st.error || "unknown"}`);
+  }
+}
+
+async function loadValidationDays() {
+  const tw = $("valTrainWindow").value;
+  const data = await api(`/api/validate/days?train_window=${encodeURIComponent(tw)}`);
+  const sel = $("valDay");
+  sel.innerHTML = (data.days || [])
+    .map((d) => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`)
+    .join("");
+  if (!data.days?.length) {
+    sel.innerHTML = `<option value="">No holdout days found</option>`;
+  }
+}
+
+function renderValidation(result) {
+  state.validateChart = renderBarChart("validateChart", result.chart, state.validateChart, "#c45c26");
+  $("validateHeadline").textContent = result.headline || "";
+  const lm = result.label_metrics || {};
+  const am = result.area_metrics || {};
+  $("validateSummary").innerHTML = `
+    <span class="status ${Number(lm.f1_micro || 0) >= 0.45 ? "normal" : "surge"}">validation</span>
+    <h3>${escapeHtml(result.headline || "")}</h3>
+    <div class="metric-row">
+      <span class="metric">tickets ${result.ticket_count}</span>
+      <span class="metric">label F1µ ${Number(lm.f1_micro || 0).toFixed(2)}</span>
+      <span class="metric">area match ${Number(am.exact_match_accuracy || 0).toFixed(2)}</span>
+    </div>
+    <ul>
+      <li>Day ${escapeHtml(result.day)} was scored against already-populated labels and impacted area.</li>
+      <li>Use Train tab to adjust parameters and re-run if accuracy is below your bar.</li>
+    </ul>
+  `;
+  const rows = (result.rows || [])
+    .map(
+      (r) => `<tr>
+      <td class="key">${escapeHtml(r.issue_key)}</td>
+      <td>${escapeHtml((r.true_labels || []).join(", ") || "—")}</td>
+      <td>${escapeHtml((r.pred_labels || []).join(", ") || "—")} ${r.label_hit ? "✓" : r.label_hit === false ? "✗" : ""}</td>
+      <td>${escapeHtml(r.true_area || "—")}</td>
+      <td>${escapeHtml(r.pred_area || "—")} ${r.area_hit ? "✓" : r.area_hit === false ? "✗" : ""}</td>
+    </tr>`
+    )
+    .join("");
+  $("validateTable").innerHTML = rows
+    ? `<table class="triage-table"><thead><tr><th>Ticket</th><th>True labels</th><th>Pred labels</th><th>True area</th><th>Pred area</th></tr></thead><tbody>${rows}</tbody></table>`
+    : "";
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    const on = p.id === `tab-${name}`;
+    p.classList.toggle("active", on);
+    p.hidden = !on;
+  });
+  if (name === "train") {
+    loadParams().catch(console.error);
+    pollTrain().catch(console.error);
+  }
+  if (name === "validate") loadValidationDays().catch(console.error);
+  if (name === "ops") reloadOps().catch(console.error);
+}
+
+async function reloadOps() {
   await loadMeta();
   await Promise.all([loadForecast(), loadCharts(), loadTriage()]);
 }
 
 async function boot() {
   wireTriageClicks();
+  document.querySelectorAll(".tab").forEach((t) =>
+    t.addEventListener("click", () => switchTab(t.dataset.tab))
+  );
   $("dimension").addEventListener("change", () => loadCharts().catch(console.error));
   $("window").addEventListener("change", () => loadCharts().catch(console.error));
   $("forecastDimension").addEventListener("change", () => loadForecast().catch(console.error));
   $("triageDays").addEventListener("change", () => loadTriage().catch(console.error));
+  $("valTrainWindow").addEventListener("change", () => loadValidationDays().catch(console.error));
 
   document.querySelectorAll(".seg-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
         await api("/api/source", { method: "POST", body: JSON.stringify({ mode: btn.dataset.mode }) });
-        await reloadAll();
+        await reloadOps();
         toast(`Source set to ${btn.dataset.mode}`);
       } catch (err) {
         toast(`Source switch failed: ${err.message}`);
@@ -338,15 +463,12 @@ async function boot() {
   $("uploadForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const file = $("fileInput").files[0];
-    if (!file) {
-      toast("Choose an Excel/CSV export first");
-      return;
-    }
+    if (!file) return toast("Choose an Excel/CSV export first");
     const body = new FormData();
     body.append("file", file);
     try {
       const result = await api("/api/import/spreadsheet", { method: "POST", body });
-      await reloadAll();
+      await reloadOps();
       toast(`Imported ${result.rows} rows from ${file.name}`);
     } catch (err) {
       toast(`Import failed: ${err.message}`);
@@ -366,10 +488,10 @@ async function boot() {
           fetch_limit: 200,
         }),
       });
-      await reloadAll();
+      await reloadOps();
       toast(`Fetched ${result.rows} issues from Jira`);
     } catch (err) {
-      toast(`Jira connect failed — use Excel import. ${err.message}`);
+      toast(`Jira connect failed — use Excel. ${err.message}`);
     }
   });
 
@@ -377,7 +499,7 @@ async function boot() {
     $("btnRefresh").disabled = true;
     try {
       await api("/api/refresh", { method: "POST" });
-      await reloadAll();
+      await reloadOps();
       toast("Data refreshed");
     } catch (err) {
       toast(`Refresh failed: ${err.message}`);
@@ -390,10 +512,8 @@ async function boot() {
     $("btnRetrain").disabled = true;
     try {
       const result = await api("/api/retrain-with-feedback", { method: "POST" });
-      await reloadAll();
-      toast(
-        `Retrained ${result.version} · labels F1 ${Number(result.metrics.labels_f1_macro || 0).toFixed(2)} · area F1 ${Number(result.metrics.area_f1_macro || 0).toFixed(2)}`
-      );
+      await reloadOps();
+      toast(`Feedback retrain ${result.version}`);
     } catch (err) {
       toast(`Retrain failed: ${err.message}`);
     } finally {
@@ -401,7 +521,42 @@ async function boot() {
     }
   });
 
-  await reloadAll();
+  $("btnTrain").addEventListener("click", async () => {
+    $("btnTrain").disabled = true;
+    try {
+      await api("/api/train/start", {
+        method: "POST",
+        body: JSON.stringify({ window: $("trainWindow").value, params: collectParams() }),
+      });
+      toast("Training started");
+      pollTrain();
+    } catch (err) {
+      toast(`Train failed: ${err.message}`);
+    } finally {
+      $("btnTrain").disabled = false;
+    }
+  });
+
+  $("btnValidate").addEventListener("click", async () => {
+    const day = $("valDay").value;
+    if (!day) return toast("No validation day available");
+    $("btnValidate").disabled = true;
+    try {
+      const result = await api("/api/validate/day", {
+        method: "POST",
+        body: JSON.stringify({ day, train_window: $("valTrainWindow").value }),
+      });
+      renderValidation(result);
+      toast(`Validated ${day}`);
+    } catch (err) {
+      toast(`Validation failed: ${err.message}`);
+    } finally {
+      $("btnValidate").disabled = false;
+    }
+  });
+
+  // Ensure spreadsheet data for Kafka demo
+  await reloadOps();
 }
 
 boot().catch((err) => {

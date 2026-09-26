@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -66,6 +67,16 @@ class JiraConnectRequest(BaseModel):
     api_token: str | None = None
 
 
+class TrainStartRequest(BaseModel):
+    window: str = "1m"  # 1m | 1y | all
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class ValidateDayRequest(BaseModel):
+    day: str
+    train_window: str = "1m"
+
+
 def _ensure_state() -> None:
     if "cfg" not in _STATE:
         _STATE["cfg"] = load_config(os.environ.get("JIRA_CAT_CONFIG"))
@@ -106,6 +117,10 @@ def _ensure_state() -> None:
     if "model" not in _STATE:
         require_attestation(cfg)
         _STATE["model"] = Categorizer.load(cfg, version="production")
+    if "train_job" not in _STATE:
+        from jira_categorizer.train.console import TrainJobState
+
+        _STATE["train_job"] = TrainJobState(paths["reports_dir"])
 
 
 def _fetch_jira_df() -> Any:
@@ -517,6 +532,103 @@ def api_retrain_with_feedback() -> dict[str, Any]:
             "area_f1_macro": result["metrics"].get("area", {}).get("f1_macro"),
         },
     }
+
+
+@app.get("/api/train/params")
+def api_train_params() -> dict[str, Any]:
+    _ensure_state()
+    from jira_categorizer.train.console import current_params
+
+    return {"params": current_params(_STATE["cfg"])}
+
+
+@app.get("/api/train/status")
+def api_train_status() -> dict[str, Any]:
+    _ensure_state()
+    return _STATE["train_job"].status()
+
+
+@app.post("/api/train/start")
+def api_train_start(req: TrainStartRequest, sync: bool = False) -> dict[str, Any]:
+    _ensure_state()
+    from jira_categorizer.train.console import apply_train_params, run_windowed_train
+
+    job = _STATE["train_job"]
+    tickets = _tickets()
+    cfg = _STATE["cfg"]
+    params = req.params or {}
+
+    def work() -> None:
+        result = run_windowed_train(
+            cfg=cfg,
+            tickets=tickets,
+            window=req.window,
+            params=params,
+            job=job,
+        )
+        _STATE["cfg"] = apply_train_params(_STATE["cfg"], params)
+        _STATE["model"] = Categorizer.load(_STATE["cfg"], version="production")
+        job.log(f"Server reloaded production model {result.get('version')}")
+
+    if sync:
+        # Deterministic path for tests / short runs
+        job.log_path.write_text("", encoding="utf-8")
+        job._write(
+            {
+                "state": "running",
+                "started_at": __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+                "finished_at": None,
+                "error": None,
+                "result": None,
+            }
+        )
+        try:
+            work()
+        except Exception as exc:
+            job._write(
+                {
+                    "state": "failed",
+                    "started_at": job.status().get("started_at"),
+                    "finished_at": __import__("datetime").datetime.now(
+                        __import__("datetime").timezone.utc
+                    ).isoformat(),
+                    "error": str(exc),
+                    "result": None,
+                }
+            )
+        return job.status()
+    return job.start(work)
+
+
+@app.get("/api/validate/days")
+def api_validate_days(train_window: str = "1m") -> dict[str, Any]:
+    _ensure_state()
+    from jira_categorizer.train.console import available_validation_days
+
+    days = available_validation_days(_tickets(), train_window)
+    return {"train_window": train_window, "days": days}
+
+
+@app.post("/api/validate/day")
+def api_validate_day(req: ValidateDayRequest) -> dict[str, Any]:
+    _ensure_state()
+    from jira_categorizer.train.console import validate_on_day
+
+    try:
+        result = validate_on_day(
+            cfg=_STATE["cfg"],
+            tickets=_tickets(),
+            day=req.day,
+            categorizer=_STATE["model"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # Persist last validation for UI refresh
+    path = Path(_STATE["cfg"]["paths"]["reports_dir"]) / "last_validation.json"
+    path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+    return result
 
 
 @app.get("/")
