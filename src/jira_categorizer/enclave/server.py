@@ -28,7 +28,7 @@ from jira_categorizer.jira.client import JiraClient
 from jira_categorizer.monitor.new_labels import suggest_new_labels
 from jira_categorizer.monitor.surge import detect_category_surges
 
-app = FastAPI(title="Jira Enclave Categorizer", version="0.1.0")
+app = FastAPI(title="Jira Categorizer", version="0.1.0")
 _STATE: dict[str, Any] = {}
 
 UI_DIR = project_root() / "ui"

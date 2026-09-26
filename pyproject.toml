@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jira-enclave-categorizer"
+name = "jira-categorizer"
 version = "0.1.0"
-description = "Secure-enclave MLOps for Jira ticket categorization (labels + impacted area). Classical ML, Python only, no LLM."
+description = "MLOps for Jira ticket categorization (labels + impacted area). Classical ML, Python only, no LLM."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

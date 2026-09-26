@@ -1,7 +1,7 @@
-# Secure-enclave Jira categorizer — default config (no LLM)
+# Jira categorizer — default config (no LLM)
 
 project:
-  name: jira-enclave-categorizer
+  name: jira-categorizer
   version: "0.1.0"
 
 paths:
@@ -74,7 +74,7 @@ enclave:
   attest_required: true
   seal_models: true
   # Path to host-side KMS unwrap helper (enclave attests, host unwraps DEK)
-  kms_key_alias: alias/jira-categorizer-enclave
+  kms_key_alias: alias/jira-categorizer
   # Local-dev Fernet key file (never use in prod; replace with attestation+KMS)
   local_key_path: artifacts/sealed/local.dev.key
   allow_unattested_local: true   # only for local_dev

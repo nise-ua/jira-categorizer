@@ -39,7 +39,7 @@ class JiraClient:
         return bool((self.email and self.api_token) or (self.user and self.password))
 
     def _auth_header(self) -> dict[str, str]:
-        headers = {"Accept": "application/json", "Content-Type": "application/json", "User-Agent": "jira-enclave-categorizer/0.1"}
+        headers = {"Accept": "application/json", "Content-Type": "application/json", "User-Agent": "jira-categorizer/0.1"}
         if self.email and self.api_token:
             token = b64encode(f"{self.email}:{self.api_token}".encode()).decode()
             headers["Authorization"] = f"Basic {token}"

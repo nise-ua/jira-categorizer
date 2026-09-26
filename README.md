@@ -1,6 +1,6 @@
-# Jira Enclave Categorizer
+# Jira Categorizer
 
-Python-only MLOps pipeline that categorizes Jira tickets from **summary** + **description**, learning historical **labels** and **impacted area**. Runs in a **secure enclave** pattern (AWS Nitro Enclaves oriented). **No LLM.**
+Python-only MLOps pipeline that categorizes Jira tickets from **summary** + **description**, learning historical **labels** and **impacted area**. Classical MLOps for labels + impacted area. Optional Nitro enclave deploy. **No LLM.**
 
 ## What it learns
 

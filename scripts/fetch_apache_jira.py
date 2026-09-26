@@ -31,7 +31,7 @@ def fetch_page(jql: str, start_at: int, max_results: int) -> dict:
     )
     req = urllib.request.Request(
         f"{BASE}?{params}",
-        headers={"Accept": "application/json", "User-Agent": "jira-enclave-categorizer/0.1"},
+        headers={"Accept": "application/json", "User-Agent": "jira-categorizer/0.1"},
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))

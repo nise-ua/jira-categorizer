@@ -56,7 +56,7 @@ def collect_local_dev_report(image_paths: list[str] | None = None) -> Attestatio
         pcrs={
             "pcr0": fingerprint[:64],
             "pcr1": hashlib.sha256(platform.python_version().encode()).hexdigest(),
-            "pcr2": hashlib.sha256(b"jira-enclave-categorizer").hexdigest(),
+            "pcr2": hashlib.sha256(b"jira-categorizer").hexdigest(),
         },
         timestamp=datetime.now(timezone.utc).isoformat(),
         notes=(
