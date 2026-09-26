@@ -6,10 +6,10 @@ const state = {
   forecastChart: null,
   trainChart: null,
   validateChart: null,
-  incomeChart: null,
   triage: null,
   meta: null,
   trainPoll: null,
+  incomePayload: null,
 };
 
 function $(id) {
@@ -171,73 +171,67 @@ function renderIncomeSummary(payload) {
         )
         .join("")}
     </ul>
-    <p class="muted" style="margin:0.4rem 0 0;font-size:0.82rem">Inner ring = impacted area · outer ring = labels. Click to zoom.</p>
+    <p class="muted" style="margin:0.4rem 0 0;font-size:0.82rem">Tree: root = all tickets · branches = impacted area · leaves = labels.</p>
   `;
 }
 
+function treeNodeHtml(node, total, depth, expanded) {
+  const value = Number(node.value || 0);
+  const kids = node.children || [];
+  const hasKids = kids.length > 0;
+  const pct = total ? ((100 * value) / total).toFixed(0) : "0";
+  const level = depth === 0 ? "root" : hasKids ? "branch" : "leaf";
+  const meta =
+    depth === 0 ? "all income" : depth === 1 ? "impacted area" : "label";
+  const toggle = hasKids
+    ? `<button type="button" class="tree-toggle" aria-label="Toggle branch" data-action="toggle">${expanded ? "−" : "+"}</button>`
+    : `<span class="tree-toggle leaf" aria-hidden="true">•</span>`;
+  const childUl = hasKids
+    ? `<ul>${kids.map((c) => treeNodeHtml(c, total, depth + 1, depth >= 1)).join("")}</ul>`
+    : "";
+  return `<li class="${expanded || !hasKids ? "" : "collapsed"}" data-depth="${depth}">
+    <div class="tree-node ${level}" data-action="${hasKids ? "toggle" : ""}" role="treeitem" aria-expanded="${hasKids ? expanded : undefined}">
+      ${toggle}
+      <div class="tree-label">
+        <strong title="${escapeAttr(node.name)}">${escapeHtml(node.name)}</strong>
+        <span class="meta">${meta} · ${pct}% of period</span>
+        <div class="tree-bar"><span style="width:${Math.max(4, Number(pct))}%"></span></div>
+      </div>
+      <span class="tree-count">${value}</span>
+    </div>
+    ${childUl}
+  </li>`;
+}
+
 function renderIncomeTree(payload) {
+  state.incomePayload = payload;
   renderIncomeSummary(payload);
-  const el = $("incomeSunburst");
-  if (typeof echarts === "undefined") {
-    el.innerHTML = `<div class="empty">Chart library unavailable — branch list on the right still shows income.</div>`;
-    return;
-  }
-  if (!state.incomeChart) {
-    state.incomeChart = echarts.init(el);
-    window.addEventListener("resize", () => state.incomeChart && state.incomeChart.resize());
-  }
-  const root = payload.sunburst || { name: "Tickets", children: [] };
-  // Ensure root has a value for center label
-  if (root.value == null) root.value = payload.total || 0;
-  const colors = ["#0F6E56", "#C45C26", "#1F4B7A", "#8B3A4A", "#5B6B2F", "#6B4C9A", "#A67C2A", "#2F6F8F"];
-  state.incomeChart.setOption(
-    {
-      color: colors,
-      series: [
-        {
-          type: "sunburst",
-          data: [root],
-          radius: [0, "95%"],
-          center: ["50%", "50%"],
-          sort: undefined,
-          emphasis: { focus: "ancestor" },
-          nodeClick: "rootToNode",
-          levels: [
-            {
-              r0: "0%",
-              r: "22%",
-              label: { rotate: 0, fontSize: 13, fontWeight: 600, fontFamily: "IBM Plex Sans" },
-              itemStyle: { color: "#13232b" },
-            },
-            {
-              r0: "22%",
-              r: "58%",
-              itemStyle: { borderWidth: 2, borderColor: "#f7fffb" },
-              label: { rotate: "tangential", fontSize: 11, fontFamily: "IBM Plex Sans" },
-            },
-            {
-              r0: "58%",
-              r: "90%",
-              label: { position: "outside", silent: false, fontSize: 10, fontFamily: "IBM Plex Sans" },
-              itemStyle: { borderWidth: 1, borderColor: "#f7fffb" },
-            },
-          ],
-          label: { color: "#13232b" },
-          itemStyle: { borderRadius: 3 },
-        },
-      ],
-      tooltip: {
-        formatter(info) {
-          const v = info.value ?? info.data?.value ?? 0;
-          const pct = payload.total ? ((100 * v) / payload.total).toFixed(0) : 0;
-          return `${info.name}<br/><b>${v}</b> tickets · ${pct}% of period`;
-        },
-      },
-    },
-    true
-  );
-  // Force layout after tab/panel visible
-  setTimeout(() => state.incomeChart && state.incomeChart.resize(), 50);
+  const el = $("incomeTree");
+  const root = payload.tree || { name: "Tickets", value: payload.total || 0, children: [] };
+  const total = Number(payload.total || root.value || 0) || 1;
+  // Root + first-level areas expanded; label leaves visible under areas
+  el.innerHTML = `<ul>${treeNodeHtml(root, total, 0, true)}</ul>`;
+}
+
+function setTreeExpanded(expandAll) {
+  document.querySelectorAll("#incomeTree li[data-depth]").forEach((li) => {
+    const depth = Number(li.dataset.depth);
+    const hasKids = !!li.querySelector(":scope > ul");
+    if (!hasKids) return;
+    if (expandAll || depth === 0) {
+      li.classList.remove("collapsed");
+      const btn = li.querySelector(":scope > .tree-node .tree-toggle");
+      if (btn && !btn.classList.contains("leaf")) btn.textContent = "−";
+      const node = li.querySelector(":scope > .tree-node");
+      if (node) node.setAttribute("aria-expanded", "true");
+    } else {
+      li.classList.add("collapsed");
+      const btn = li.querySelector(":scope > .tree-node .tree-toggle");
+      if (btn && !btn.classList.contains("leaf")) btn.textContent = "+";
+      const node = li.querySelector(":scope > .tree-node");
+      if (node) node.setAttribute("aria-expanded", "false");
+    }
+  });
 }
 
 async function loadIncomeTree() {
@@ -544,6 +538,19 @@ async function boot() {
   $("dimension").addEventListener("change", () => loadCharts().catch(console.error));
   $("window").addEventListener("change", () => loadCharts().catch(console.error));
   $("hierarchyPeriod").addEventListener("change", () => loadIncomeTree().catch(console.error));
+  $("btnTreeExpand").addEventListener("click", () => setTreeExpanded(true));
+  $("btnTreeCollapse").addEventListener("click", () => setTreeExpanded(false));
+  $("incomeTree").addEventListener("click", (ev) => {
+    const target = ev.target.closest("[data-action='toggle']");
+    if (!target) return;
+    const li = target.closest("li");
+    if (!li || !li.querySelector(":scope > ul")) return;
+    const collapsed = li.classList.toggle("collapsed");
+    const btn = li.querySelector(":scope > .tree-node .tree-toggle");
+    if (btn && !btn.classList.contains("leaf")) btn.textContent = collapsed ? "+" : "−";
+    const node = li.querySelector(":scope > .tree-node");
+    if (node) node.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  });
   $("forecastDimension").addEventListener("change", () => loadForecast().catch(console.error));
   $("triageDays").addEventListener("change", () => loadTriage().catch(console.error));
   $("valTrainWindow").addEventListener("change", () => loadValidationDays().catch(console.error));

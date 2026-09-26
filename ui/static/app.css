@@ -281,23 +281,141 @@ select, .triage-table select {
 
 .exec-grid {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
+  grid-template-columns: 1.45fr 1fr;
   gap: 1rem;
   align-items: stretch;
 }
-.sunburst-card {
+.tree-card {
   border: 1px solid var(--line);
   background:
-    radial-gradient(circle at 30% 20%, rgba(15, 110, 86, 0.10), transparent 55%),
-    radial-gradient(circle at 80% 70%, rgba(196, 92, 38, 0.10), transparent 50%),
+    radial-gradient(circle at 8% 0%, rgba(15, 110, 86, 0.12), transparent 45%),
     rgba(255,255,255,0.72);
   min-height: 380px;
-  padding: 0.4rem;
+  max-height: 520px;
+  overflow: auto;
+  padding: 0.85rem 1rem 1.1rem;
 }
-.sunburst {
-  width: 100%;
-  height: 380px;
+.income-tree {
+  font-family: var(--font);
+  --guide: rgba(19, 35, 43, 0.14);
 }
+.income-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  position: relative;
+}
+.income-tree > ul { padding-left: 0; }
+.income-tree ul::before {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.55rem;
+  left: 0.35rem;
+  border-left: 1px solid var(--guide);
+}
+.income-tree > ul::before { display: none; }
+.income-tree li {
+  position: relative;
+  margin: 0.15rem 0;
+}
+.income-tree li::before {
+  content: "";
+  position: absolute;
+  top: 1.05rem;
+  left: -0.75rem;
+  width: 0.7rem;
+  border-top: 1px solid var(--guide);
+}
+.income-tree > ul > li::before { display: none; }
+.tree-node {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid transparent;
+  cursor: default;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.tree-node:hover {
+  background: rgba(15, 110, 86, 0.06);
+  border-color: var(--line);
+}
+.tree-node.root {
+  background: rgba(19, 35, 43, 0.92);
+  color: #f7fffb;
+  margin-bottom: 0.45rem;
+}
+.tree-node.root:hover { background: rgba(19, 35, 43, 0.96); border-color: transparent; }
+.tree-node.branch { cursor: pointer; }
+.tree-toggle {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: 700 0.85rem var(--mono);
+  line-height: 1;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+.tree-node.root .tree-toggle {
+  border-color: rgba(247, 255, 251, 0.35);
+  background: transparent;
+  color: #f7fffb;
+}
+.tree-toggle.leaf {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  font-size: 0.7rem;
+}
+.tree-label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.tree-label strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-label .meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.tree-node.root .tree-label .meta { color: rgba(247, 255, 251, 0.7); }
+.tree-count {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tree-bar {
+  grid-column: 2 / 3;
+  height: 5px;
+  background: rgba(19, 35, 43, 0.08);
+  overflow: hidden;
+  margin-top: -0.15rem;
+}
+.tree-node.root .tree-bar { background: rgba(247, 255, 251, 0.15); }
+.tree-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal), #2a9d7a);
+}
+.tree-node.root .tree-bar > span {
+  background: linear-gradient(90deg, #7dcea0, #f0c27a);
+}
+.income-tree li.collapsed > ul { display: none; }
+
 .exec-summary .total-hero {
   font-size: clamp(2.2rem, 4vw, 3.2rem);
   font-weight: 700;
