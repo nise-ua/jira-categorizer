@@ -187,8 +187,9 @@ function treeNodeHtml(node, total, depth, expanded) {
     ? `<button type="button" class="tree-toggle" aria-label="Toggle branch" data-action="toggle">${expanded ? "−" : "+"}</button>`
     : `<span class="tree-toggle leaf" aria-hidden="true">•</span>`;
   const childUl = hasKids
-    ? `<ul>${kids.map((c) => treeNodeHtml(c, total, depth + 1, depth >= 1)).join("")}</ul>`
+    ? `<ul>${kids.map((c) => treeNodeHtml(c, total, depth + 1, depth < 1)).join("")}</ul>`
     : "";
+  // expanded=true means this node's children are visible
   return `<li class="${expanded || !hasKids ? "" : "collapsed"}" data-depth="${depth}">
     <div class="tree-node ${level}" data-action="${hasKids ? "toggle" : ""}" role="treeitem" aria-expanded="${hasKids ? expanded : undefined}">
       ${toggle}
