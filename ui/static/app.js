@@ -1,4 +1,4 @@
-/* global Chart */
+/* global Chart, echarts */
 
 const state = {
   categoryChart: null,
@@ -6,6 +6,7 @@ const state = {
   forecastChart: null,
   trainChart: null,
   validateChart: null,
+  incomeChart: null,
   triage: null,
   meta: null,
   trainPoll: null,
@@ -149,6 +150,81 @@ function renderDaySummary(payload) {
     <ul>${(summary.bullets || []).map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>
   `;
   $("dayMarker").textContent = `As of ${payload.as_of || "—"} · today ${payload.today || "—"} · tomorrow ${payload.tomorrow || "—"} (UTC)`;
+}
+
+function renderIncomeTree(payload) {
+  const el = $("incomeSunburst");
+  if (!state.incomeChart) {
+    state.incomeChart = echarts.init(el);
+    window.addEventListener("resize", () => state.incomeChart && state.incomeChart.resize());
+  }
+  const colors = ["#0F6E56", "#C45C26", "#1F4B7A", "#8B3A4A", "#5B6B2F", "#6B4C9A", "#A67C2A", "#2F6F8F"];
+  state.incomeChart.setOption(
+    {
+      color: colors,
+      series: [
+        {
+          type: "sunburst",
+          data: payload.sunburst?.children || [],
+          radius: [28, "92%"],
+          sort: undefined,
+          emphasis: { focus: "ancestor" },
+          levels: [
+            {},
+            {
+              r0: "28%",
+              r: "58%",
+              itemStyle: { borderWidth: 2, borderColor: "#f7fffb" },
+              label: { rotate: "tangential", fontSize: 11, fontFamily: "IBM Plex Sans" },
+            },
+            {
+              r0: "58%",
+              r: "92%",
+              label: { position: "outside", silent: false, fontSize: 10, fontFamily: "IBM Plex Sans" },
+              itemStyle: { borderWidth: 1, borderColor: "#f7fffb" },
+            },
+          ],
+          label: { color: "#13232b" },
+          itemStyle: { borderRadius: 4 },
+        },
+      ],
+      tooltip: {
+        formatter(info) {
+          const v = info.value ?? info.data?.value ?? 0;
+          const pct = payload.total ? ((100 * v) / payload.total).toFixed(0) : 0;
+          return `${info.name}<br/><b>${v}</b> tickets · ${pct}% of period`;
+        },
+      },
+    },
+    true
+  );
+
+  const box = $("incomeSummary");
+  const tops = payload.top_areas || [];
+  const max = tops[0]?.count || 1;
+  box.innerHTML = `
+    <span class="status normal">live income</span>
+    <p class="muted" style="margin:0">Selected period · ${escapeHtml(payload.period)}</p>
+    <p class="total-hero">${Number(payload.total || 0)}</p>
+    <h3>${escapeHtml(payload.headline || "")}</h3>
+    <ul class="branch-list">
+      ${tops
+        .map(
+          (t) => `<li>
+            <span>${escapeHtml(t.name)}</span><strong>${t.count}</strong>
+            <div class="bar"><span style="width:${Math.max(6, (100 * t.count) / max)}%"></span></div>
+          </li>`
+        )
+        .join("")}
+    </ul>
+    <p class="muted" style="margin:0.4rem 0 0;font-size:0.82rem">Outer ring = labels inside each area. Click a segment to zoom.</p>
+  `;
+}
+
+async function loadIncomeTree() {
+  const period = $("hierarchyPeriod").value;
+  const payload = await api(`/api/hierarchy?period=${encodeURIComponent(period)}`);
+  renderIncomeTree(payload);
 }
 
 async function loadForecast() {
@@ -434,7 +510,7 @@ function switchTab(name) {
 
 async function reloadOps() {
   await loadMeta();
-  await Promise.all([loadForecast(), loadCharts(), loadTriage()]);
+  await Promise.all([loadIncomeTree(), loadForecast(), loadCharts(), loadTriage()]);
 }
 
 async function boot() {
@@ -444,6 +520,7 @@ async function boot() {
   );
   $("dimension").addEventListener("change", () => loadCharts().catch(console.error));
   $("window").addEventListener("change", () => loadCharts().catch(console.error));
+  $("hierarchyPeriod").addEventListener("change", () => loadIncomeTree().catch(console.error));
   $("forecastDimension").addEventListener("change", () => loadForecast().catch(console.error));
   $("triageDays").addEventListener("change", () => loadTriage().catch(console.error));
   $("valTrainWindow").addEventListener("change", () => loadValidationDays().catch(console.error));

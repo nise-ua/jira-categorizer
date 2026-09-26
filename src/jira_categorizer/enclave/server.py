@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from jira_categorizer.analytics.forecast import build_forecast_actual
+from jira_categorizer.analytics.hierarchy import build_income_tree
 from jira_categorizer.analytics.timeseries import build_novelty_timeseries, build_timeseries
 from jira_categorizer.analytics.triage import build_triage_queue
 from jira_categorizer.config import load_config, project_root
@@ -377,6 +378,16 @@ def api_refresh() -> dict[str, Any]:
         "source_mode": _STATE.get("source_mode"),
         "source": _STATE["cache"]._meta_read(),
     }
+
+
+@app.get("/api/hierarchy")
+def api_hierarchy(period: str = "1d") -> dict[str, Any]:
+    """Executive tree: total → impacted area → labels for a live period."""
+    _ensure_state()
+    try:
+        return build_income_tree(_tickets(), period=period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/forecast")
