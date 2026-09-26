@@ -1,0 +1,31 @@
+issue_key,summary,description,labels,impacted_area
+PAY-101,Checkout fails with 504 on card submit,Customers in EU cannot complete payment. Gateway timeout after 30s on /v2/charges.,payments|p1,payments
+PAY-102,Refund webhook missing order id,Refund callbacks arrive without order_id so ledger stays open.,payments|webhooks,payments
+PAY-103,3DS challenge loop on Safari,Safari users stuck in 3DS redirect loop during checkout.,payments|browser,payments
+AUTH-201,SSO login redirects to blank page,Azure AD SSO returns empty state after callback for mobile web.,auth|sso,authentication
+AUTH-202,Password reset emails delayed,Users wait over 20 minutes for reset link from SendGrid.,auth|email,authentication
+AUTH-203,MFA push notification not delivered,Okta MFA push never arrives on enrolled devices for VIP users.,auth|mfa,authentication
+API-301,Rate limit errors on catalog search,/catalog/search returns 429 under normal traffic after deploy.,api|performance,api-gateway
+API-302,GraphQL schema mismatch on product type,Client codegen fails because Product.price became nested object.,api|graphql,api-gateway
+API-303,OpenAPI docs missing new endpoints,Partner portal still shows old swagger without /v3 routes.,api|docs,api-gateway
+UI-401,Cart badge count wrong after delete,Removing an item leaves badge at old quantity until refresh.,ui|cart,storefront
+UI-402,Dark mode contrast fails WCAG on buttons,Primary button text is unreadable in dark theme.,ui|a11y,storefront
+UI-403,Mobile nav overlaps footer on iOS,Hamburger menu content covers footer links on iPhone SE.,ui|mobile,storefront
+DATA-501,Nightly ETL job failed on currency table,Snowflake load aborted due to null ISO currency codes from ERP.,data|etl,data-platform
+DATA-502,Dashboard shows stale revenue numbers,BI revenue tile not refreshed since Friday pipeline skip.,data|bi,data-platform
+DATA-503,PII columns exported to sandbox,Analytics extract included email and phone into non-prod bucket.,data|privacy|p1,data-platform
+INFRA-601,Kubernetes node disk pressure,Checkout pods evicted because node disk usage exceeded 90%.,infra|k8s,infrastructure
+INFRA-602,TLS cert expiry alert for api.example.com,Certificate expires in 5 days; renew before weekend traffic.,infra|tls,infrastructure
+INFRA-603,NAT gateway bandwidth saturated,Egress throttling affects image pulls in prod cluster.,infra|network,infrastructure
+PAY-104,Apple Pay sheet closes immediately,iOS wallet sheet dismisses before authorization on iPhone 15.,payments|mobile|apple-pay,payments
+AUTH-204,Session cookie not set on subdomain,Login succeeds but api.shop cookie missing Secure SameSite attrs.,auth|cookies,authentication
+API-304,Idempotency-Key ignored on POST /orders,Duplicate orders created when client retries with same key.,api|orders|p1,api-gateway
+UI-404,Promo banner blocks CTA on homepage,Seasonal banner overlaps Add to Cart on tablet breakpoints.,ui|promo,storefront
+DATA-504,CDC lag on orders topic,Kafka Connect lag > 15 minutes for orders.cdc.,data|streaming,data-platform
+INFRA-604,Canary deploy stuck in progress,Argo rollout never promotes canary for payments-service.,infra|deploy,infrastructure
+PAY-105,Chargeback report missing MID,Finance cannot reconcile because MID empty in dispute export.,payments|finance,payments
+AUTH-205,SCIM deprovision delay,Disabled Okta users still have active app sessions for hours.,auth|scim,authentication
+API-305,CORS failure from partner domain,Preflight from partners.example blocked after gateway change.,api|cors,api-gateway
+UI-405,Search autocomplete returns irrelevant brands,Typing nike suggests unrelated private-label SKUs.,ui|search,storefront
+DATA-505,dbt model unique test failing,fct_orders unique_order_id test fails after backfill.,data|dbt,data-platform
+INFRA-605,Fluent Bit dropping logs,High cardinality labels cause log agent OOMKill.,infra|observability,infrastructure

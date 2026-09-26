@@ -1,0 +1,85 @@
+# Secure-enclave Jira categorizer — default config (no LLM)
+
+project:
+  name: jira-enclave-categorizer
+  version: "0.1.0"
+
+paths:
+  raw_data: sample_data/jira_export.csv
+  processed_dir: artifacts/processed
+  model_dir: artifacts/models
+  metrics_dir: artifacts/metrics
+  reports_dir: artifacts/reports
+  sealed_dir: artifacts/sealed
+
+data:
+  # Source fields used as model input
+  text_fields:
+    - summary
+    - description
+  # Targets learned from historical tickets
+  label_field: labels          # multi-label (pipe- or semicolon-separated)
+  area_field: impacted_area    # multi-class (or multi-label if pipe-separated)
+  issue_key_field: issue_key
+  min_label_support: 2         # drop rare labels below this count
+  min_area_support: 2
+  test_size: 0.2
+  random_state: 42
+
+features:
+  # Classical text features only (TF-IDF word + char n-grams)
+  word_ngram_range: [1, 2]
+  char_ngram_range: [3, 5]
+  max_word_features: 20000
+  max_char_features: 15000
+  min_df: 1
+  lowercase: true
+  strip_html: true
+
+models:
+  # Multi-label labels: OneVsRest + LinearSVC (calibrated-friendly path via decision)
+  labels:
+    algorithm: logistic_regression   # logistic_regression | linear_svc
+    C: 2.0
+    max_iter: 2000
+    class_weight: balanced
+    decision_threshold: 0.35
+  # Impacted area: multiclass (or multilabel if values are multi-valued)
+  area:
+    algorithm: logistic_regression
+    C: 2.0
+    max_iter: 2000
+    class_weight: balanced
+
+training:
+  cv_folds: 3
+  # Retrain trigger for MLOps loop
+  min_f1_macro_labels: 0.35
+  min_f1_macro_area: 0.40
+  promote_if_better: true
+
+inference:
+  host: "127.0.0.1"
+  port: 8080
+  # Inside Nitro enclave, prefer vsock; host proxies to this HTTP loopback
+  vsock_port: 5000
+  top_k_labels: 5
+
+enclave:
+  # AWS Nitro Enclaves oriented settings
+  mode: nitro                    # nitro | local_dev
+  attest_required: true
+  seal_models: true
+  # Path to host-side KMS unwrap helper (enclave attests, host unwraps DEK)
+  kms_key_alias: alias/jira-categorizer-enclave
+  # Local-dev Fernet key file (never use in prod; replace with attestation+KMS)
+  local_key_path: artifacts/sealed/local.dev.key
+  allow_unattested_local: true   # only for local_dev
+
+mlops:
+  experiment_name: jira-cat-v1
+  registry_name: production
+  drift_check:
+    enabled: true
+    # Simple PSI-style check on token length / top terms
+    max_mean_text_len_shift: 0.35

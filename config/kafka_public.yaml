@@ -1,0 +1,74 @@
+# Config for public Apache Kafka Jira experiment (~100 tickets)
+
+project:
+  name: jira-enclave-categorizer
+  version: "0.1.0"
+
+paths:
+  raw_data: sample_data/public_jira/kafka_100.csv
+  processed_dir: artifacts/processed/kafka_public
+  model_dir: artifacts/models/kafka_public
+  metrics_dir: artifacts/metrics/kafka_public
+  reports_dir: artifacts/reports/kafka_public
+  sealed_dir: artifacts/sealed/kafka_public
+
+data:
+  text_fields:
+    - summary
+    - description
+  label_field: labels
+  area_field: impacted_area
+  issue_key_field: issue_key
+  min_label_support: 3
+  min_area_support: 3
+  test_size: 0.25
+  random_state: 42
+
+features:
+  word_ngram_range: [1, 2]
+  char_ngram_range: [3, 5]
+  max_word_features: 15000
+  max_char_features: 10000
+  min_df: 1
+  lowercase: true
+  strip_html: true
+
+models:
+  labels:
+    algorithm: logistic_regression
+    C: 2.0
+    max_iter: 3000
+    class_weight: balanced
+    decision_threshold: 0.30
+  area:
+    algorithm: logistic_regression
+    C: 2.0
+    max_iter: 3000
+    class_weight: balanced
+
+training:
+  cv_folds: 3
+  min_f1_macro_labels: 0.05
+  min_f1_macro_area: 0.15
+  promote_if_better: true
+
+inference:
+  host: "127.0.0.1"
+  port: 8080
+  vsock_port: 5000
+  top_k_labels: 5
+
+enclave:
+  mode: local_dev
+  attest_required: false
+  seal_models: true
+  kms_key_alias: alias/jira-categorizer-enclave
+  local_key_path: artifacts/sealed/kafka_public/local.dev.key
+  allow_unattested_local: true
+
+mlops:
+  experiment_name: kafka-public-100
+  registry_name: production
+  drift_check:
+    enabled: true
+    max_mean_text_len_shift: 0.50
